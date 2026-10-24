@@ -37,7 +37,7 @@ async function send(body){
     const r=await fetch('/api/fix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
     if(my!==count)return;
-    if(d.heard)t.value=d.heard;
+    if(d.heard&&body.audio)t.value=d.heard;
     out.innerText=d.result||d.error||'Kuch gadbad hui';
   }catch(e){if(my===count)out.innerText='Error: '+e}
 }
