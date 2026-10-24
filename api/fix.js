@@ -3,22 +3,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Sirf POST chalega" });
   }
 
-  const { text, mode } = req.body || {};
+  const { text } = req.body || {};
   if (!text) {
     return res.status(400).json({ error: "Text nahi mila" });
   }
 
-  const rules = {
-    grammar: "Fix the grammar and tense.",
-    spelling: "Fix only the spelling mistakes.",
-    punctuation: "Add correct punctuation and capital letters only.",
-    rewrite: "Rewrite the text to be clear and natural.",
-  };
-
   const prompt =
-    rules[mode] +
-    " Keep the SAME language as the input (English, Hindi or Hinglish). " +
-    "Do NOT change the meaning. If unsure, keep the original words. " +
+    "Fix ALL mistakes in the text below: spelling, grammar, tense, capital letters and punctuation. " +
+    "Keep the SAME language as the input (English, Hindi or Hinglish). " +
+    "Do NOT change the meaning. Do not add new information. If unsure, keep the original words. " +
     "Reply with ONLY the corrected text, nothing else.\n\nText:\n" +
     text;
 
