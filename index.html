@@ -7,53 +7,80 @@
 <style>
 body{font-family:sans-serif;margin:0;padding:16px;background:#f5f5f5}
 h2{margin-top:0}
-textarea{width:100%;height:150px;font-size:18px;padding:10px;box-sizing:border-box}
+select{font-size:16px;padding:10px;border-radius:8px;width:100%;margin-bottom:10px}
+textarea{width:100%;height:120px;font-size:17px;padding:10px;box-sizing:border-box}
 button{font-size:16px;padding:12px;margin:4px 2px;border:0;border-radius:8px;background:#2563eb;color:#fff}
-#v{background:#16a34a}
-#out{background:#fff;padding:12px;margin-top:12px;min-height:60px;font-size:18px;border-radius:8px}
+#mic{width:100%;font-size:20px;padding:18px;background:#16a34a;margin:8px 0}
+#mic.on{background:#dc2626}
+#out{background:#fff;padding:12px;margin-top:12px;min-height:60px;font-size:18px;border-radius:8px;white-space:pre-wrap}
 </style>
 </head>
 <body>
 <h2>✍️ Tera AI</h2>
-<textarea id="t" placeholder="Yahan likho ya bolo... apne aap sahi ho jayega"></textarea>
-<div>
-<button id="v" onclick="voice()">🎙️ Voice</button>
-<button onclick="copyIt()">📋 Copy</button>
-</div>
+<select id="lang">
+<option value="hinglish">Hinglish</option>
+<option value="english">English</option>
+<option value="hindi">Hindi</option>
+</select>
+<button id="mic" onclick="toggle()">🎙️ Bolna shuru karo</button>
+<textarea id="t" placeholder="Bolo ya likho. Bolna band karoge to sahi text neeche aayega."></textarea>
 <div id="out">Sahi text yahan aayega</div>
+<button onclick="copyIt()">📋 Copy</button>
 <script>
-let timer, count = 0;
-const t = document.getElementById('t');
-const out = document.getElementById('out');
+const t=document.getElementById('t'), out=document.getElementById('out');
+const mic=document.getElementById('mic'), langSel=document.getElementById('lang');
+let timer, count=0, listening=false, rec=null, base='';
 
-t.addEventListener('input', () => {
-  clearTimeout(timer);
-  timer = setTimeout(fix, 1000);
-});
+t.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(fix,1000)});
 
 async function fix(){
-  const text = t.value.trim();
-  if(!text){ out.innerText = 'Sahi text yahan aayega'; return }
-  const my = ++count;
-  out.innerText = 'Soch raha hoon...';
+  const text=t.value.trim();
+  if(!text){out.innerText='Sahi text yahan aayega';return}
+  const my=++count;
+  out.innerText='Soch raha hoon...';
   try{
-    const r = await fetch('/api/fix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
-    const d = await r.json();
-    if(my !== count) return;
-    out.innerText = d.result || d.error || 'Kuch gadbad hui';
-  }catch(e){ if(my === count) out.innerText = 'Error: ' + e }
+    const r=await fetch('/api/fix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,lang:langSel.value})});
+    const d=await r.json();
+    if(my!==count)return;
+    out.innerText=d.result||d.error||'Kuch gadbad hui';
+  }catch(e){if(my===count)out.innerText='Error: '+e}
 }
 
-function voice(){
-  const S = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!S){ alert('Chrome use karo'); return }
-  const s = new S();
-  s.lang = 'en-IN';
-  s.onresult = e => {
-    t.value += ' ' + e.results[0][0].transcript;
-    fix();
+function startRec(){
+  const S=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!S){alert('Chrome use karo');listening=false;return}
+  rec=new S();
+  rec.lang=langSel.value==='english'?'en-IN':'hi-IN';
+  rec.interimResults=true;
+  rec.continuous=false;
+  rec.onresult=e=>{
+    let interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const tr=e.results[i][0].transcript;
+      if(e.results[i].isFinal){base+=tr+' '}else{interim+=tr}
+    }
+    t.value=base+interim;
   };
-  s.start();
+  rec.onend=()=>{
+    if(listening){startRec()}
+    else{t.value=base.trim();fix()}
+  };
+  rec.start();
+}
+
+function toggle(){
+  if(!listening){
+    listening=true;
+    base=t.value?t.value+' ':'';
+    mic.classList.add('on');
+    mic.innerText='⏹️ Band karo';
+    startRec();
+  }else{
+    listening=false;
+    mic.classList.remove('on');
+    mic.innerText='🎙️ Bolna shuru karo';
+    if(rec)rec.stop();
+  }
 }
 
 function copyIt(){
