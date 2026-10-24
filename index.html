@@ -15,34 +15,50 @@ button{font-size:16px;padding:12px;margin:4px 2px;border:0;border-radius:8px;bac
 </head>
 <body>
 <h2>✍️ Tera AI</h2>
-<textarea id="t" placeholder="Yahan likho ya bolo..."></textarea>
+<textarea id="t" placeholder="Yahan likho ya bolo... apne aap sahi ho jayega"></textarea>
 <div>
-<button onclick="go('grammar')">Fix Grammar</button>
-<button onclick="go('spelling')">Fix Spelling</button>
-<button onclick="go('punctuation')">Add Punctuation</button>
-<button onclick="go('rewrite')">Rewrite</button>
 <button id="v" onclick="voice()">🎙️ Voice</button>
+<button onclick="copyIt()">📋 Copy</button>
 </div>
-<div id="out">Result yahan aayega</div>
+<div id="out">Sahi text yahan aayega</div>
 <script>
-async function go(mode){
-  const text=document.getElementById('t').value;
-  const out=document.getElementById('out');
-  if(!text){out.innerText='Pehle kuch likho';return}
-  out.innerText='Soch raha hoon...';
+let timer, count = 0;
+const t = document.getElementById('t');
+const out = document.getElementById('out');
+
+t.addEventListener('input', () => {
+  clearTimeout(timer);
+  timer = setTimeout(fix, 1000);
+});
+
+async function fix(){
+  const text = t.value.trim();
+  if(!text){ out.innerText = 'Sahi text yahan aayega'; return }
+  const my = ++count;
+  out.innerText = 'Soch raha hoon...';
   try{
-    const r=await fetch('/api/fix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,mode})});
-    const d=await r.json();
-    out.innerText=d.result||d.error||'Kuch gadbad hui';
-  }catch(e){out.innerText='Error: '+e}
+    const r = await fetch('/api/fix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+    const d = await r.json();
+    if(my !== count) return;
+    out.innerText = d.result || d.error || 'Kuch gadbad hui';
+  }catch(e){ if(my === count) out.innerText = 'Error: ' + e }
 }
+
 function voice(){
-  const S=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!S){alert('Chrome use karo');return}
-  const s=new S();
-  s.lang='en-IN';
-  s.onresult=e=>{document.getElementById('t').value+=' '+e.results[0][0].transcript};
+  const S = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!S){ alert('Chrome use karo'); return }
+  const s = new S();
+  s.lang = 'en-IN';
+  s.onresult = e => {
+    t.value += ' ' + e.results[0][0].transcript;
+    fix();
+  };
   s.start();
+}
+
+function copyIt(){
+  navigator.clipboard.writeText(out.innerText);
+  alert('Copy ho gaya');
 }
 </script>
 </body>
