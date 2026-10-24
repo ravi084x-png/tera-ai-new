@@ -7,7 +7,6 @@
 <style>
 body{font-family:sans-serif;margin:0;padding:16px;background:#f5f5f5}
 h2{margin-top:0}
-select{font-size:16px;padding:10px;border-radius:8px;width:100%;margin-bottom:10px}
 textarea{width:100%;height:120px;font-size:17px;padding:10px;box-sizing:border-box}
 button{font-size:16px;padding:12px;margin:4px 2px;border:0;border-radius:8px;background:#2563eb;color:#fff}
 #mic{width:100%;font-size:20px;padding:18px;background:#16a34a;margin:8px 0}
@@ -17,69 +16,63 @@ button{font-size:16px;padding:12px;margin:4px 2px;border:0;border-radius:8px;bac
 </head>
 <body>
 <h2>✍️ Tera AI</h2>
-<select id="lang">
-<option value="hinglish">Hinglish</option>
-<option value="english">English</option>
-<option value="hindi">Hindi</option>
-</select>
 <button id="mic" onclick="toggle()">🎙️ Bolna shuru karo</button>
-<textarea id="t" placeholder="Bolo ya likho. Bolna band karoge to sahi text neeche aayega."></textarea>
+<textarea id="t" placeholder="Kisi bhi bhasha mein bolo ya likho. Apne aap sahi ho jayega."></textarea>
 <div id="out">Sahi text yahan aayega</div>
 <button onclick="copyIt()">📋 Copy</button>
 <script>
 const t=document.getElementById('t'), out=document.getElementById('out');
-const mic=document.getElementById('mic'), langSel=document.getElementById('lang');
-let timer, count=0, listening=false, rec=null, base='';
+const mic=document.getElementById('mic');
+let timer, count=0, recording=false, mr=null, chunks=[], stream=null;
 
-t.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(fix,1000)});
+t.addEventListener('input',()=>{
+  clearTimeout(timer);
+  timer=setTimeout(fixText,1000);
+});
 
-async function fix(){
-  const text=t.value.trim();
-  if(!text){out.innerText='Sahi text yahan aayega';return}
+async function send(body){
   const my=++count;
   out.innerText='Soch raha hoon...';
   try{
-    const r=await fetch('/api/fix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,lang:langSel.value})});
+    const r=await fetch('/api/fix',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
     if(my!==count)return;
+    if(d.heard)t.value=d.heard;
     out.innerText=d.result||d.error||'Kuch gadbad hui';
   }catch(e){if(my===count)out.innerText='Error: '+e}
 }
 
-function startRec(){
-  const S=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!S){alert('Chrome use karo');listening=false;return}
-  rec=new S();
-  rec.lang=langSel.value==='english'?'en-IN':'hi-IN';
-  rec.interimResults=true;
-  rec.continuous=false;
-  rec.onresult=e=>{
-    let interim='';
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      const tr=e.results[i][0].transcript;
-      if(e.results[i].isFinal){base+=tr+' '}else{interim+=tr}
-    }
-    t.value=base+interim;
-  };
-  rec.onend=()=>{
-    if(listening){startRec()}
-    else{t.value=base.trim();fix()}
-  };
-  rec.start();
+function fixText(){
+  const text=t.value.trim();
+  if(!text){out.innerText='Sahi text yahan aayega';return}
+  send({text});
 }
 
-function toggle(){
-  if(!listening){
-    listening=true;
-    base=t.value?t.value+' ':'';
+async function toggle(){
+  if(!recording){
+    try{
+      stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    }catch(e){alert('Mic ki permission do');return}
+    chunks=[];
+    mr=new MediaRecorder(stream);
+    mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+    mr.onstop=()=>{
+      stream.getTracks().forEach(x=>x.stop());
+      const type=mr.mimeType||'audio/webm';
+      const blob=new Blob(chunks,{type});
+      const fr=new FileReader();
+      fr.onload=()=>send({audio:fr.result.split(',')[1],mime:type});
+      fr.readAsDataURL(blob);
+    };
+    mr.start();
+    recording=true;
     mic.classList.add('on');
     mic.innerText='⏹️ Band karo';
-    startRec();
   }else{
-    listening=false;
+    recording=false;
     mic.classList.remove('on');
     mic.innerText='🎙️ Bolna shuru karo';
-    if(rec)rec.stop();
+    mr.stop();
   }
 }
 
